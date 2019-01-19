@@ -5,7 +5,11 @@ var fs=require('fs-extra');
 var config = new (require('v-conf'))();
 var exec = require('child_process').exec;
 var execSync = require('child_process').execSync;
+var io = require('socket.io-client');
+var socket = io.connect('http://localhost:3000');
 
+const SerialPort = require('serialport')
+const Delimiter = require('@serialport/parser-delimiter')
 
 module.exports = lcdctrl;
 function lcdctrl(context) {
@@ -15,10 +19,21 @@ function lcdctrl(context) {
 	this.commandRouter = this.context.coreCommand;
 	this.logger = this.context.logger;
 	this.configManager = this.context.configManager;
+	this.port = null;
 
 }
 
-
+function hex(str) {
+	    var arr = [];
+	    for (var i = 0, l = str.length; i < l; i ++) {
+		                var ascii = str.charCodeAt(i);
+		                arr.push(ascii);
+		        }
+	    arr.push(255);
+	    arr.push(255);
+	    arr.push(255);
+	    return new Buffer(arr);
+}
 
 lcdctrl.prototype.onVolumioStart = function()
 {
@@ -33,7 +48,30 @@ lcdctrl.prototype.onVolumioStart = function()
 lcdctrl.prototype.onStart = function() {
     var self = this;
 	var defer=libQ.defer();
+	this.port = new SerialPort('/dev/ttyUSB0', { baudRate: 9600 });
 
+	this.parser = this.port.pipe(new Delimiter({ delimiter: hex('') }));
+	this.parser.on('data', function(data){
+		var prefix = data.toString('ascii',0,1);
+		var command = data.toString('ascii',1);
+		if(prefix == "p" || prefix == "q")
+		{
+			switch(command)
+			{
+				case "play":
+					socket.emit('play');
+					break;
+				case "next":
+					socket.emit('next');
+					break;
+				case "prev":
+					socket.emit('prev');
+					break;
+				default:
+					break;
+			}
+		}
+	});
 
 	// Once the Plugin has successfull started resolve the promise
 	defer.resolve();

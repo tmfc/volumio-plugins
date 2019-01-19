@@ -6,7 +6,8 @@ var config = new (require('v-conf'))();
 var exec = require('child_process').exec;
 var execSync = require('child_process').execSync;
 var io = require('socket.io-client');
-var socket = io.connect('http://localhost:3000');
+var socket;
+var iconv = require('iconv-lite');
 
 const SerialPort = require('serialport')
 const Delimiter = require('@serialport/parser-delimiter')
@@ -24,15 +25,12 @@ function lcdctrl(context) {
 }
 
 function hex(str) {
-	    var arr = [];
-	    for (var i = 0, l = str.length; i < l; i ++) {
-		                var ascii = str.charCodeAt(i);
-		                arr.push(ascii);
-		        }
-	    arr.push(255);
-	    arr.push(255);
-	    arr.push(255);
-	    return new Buffer(arr);
+	var buf = iconv.encode(str, 'gb2312');
+	var arr = [];
+	arr.push(255);
+	arr.push(255);
+	arr.push(255);
+	return Buffer.concat([buf,new Buffer(arr)]);
 }
 
 lcdctrl.prototype.onVolumioStart = function()
@@ -47,6 +45,20 @@ lcdctrl.prototype.onVolumioStart = function()
 
 lcdctrl.prototype.onStart = function() {
     var self = this;
+	socket = io.connect('http://localhost:3000');
+	socket.on('pushState',function(state){
+		self.logger.info("lcd ctrl pushState received");
+		//self.logger.info(iconv.encode('title.txt="' + state.title + '"','gb2312'));
+		//self.logger.info(hex('title.txt="' + state.title + '"'));
+		self.port.write(hex('title.txt="' + state.title  + '"'),function(err){
+			if (err) {
+			   	self.logger.info('lcd ctrl:Error on write: ', err.message)
+			}
+			self.logger.info('lcd ctrl:message written')
+		});
+		self.port.write(hex('artist.txt="' + state.artist + '"'),function(err){});
+		console.log('message written')
+	});
 	var defer=libQ.defer();
 	this.port = new SerialPort('/dev/ttyUSB0', { baudRate: 9600 });
 
@@ -59,7 +71,16 @@ lcdctrl.prototype.onStart = function() {
 			switch(command)
 			{
 				case "play":
-					socket.emit('play');
+					socket.emit('getState','');
+					socket.once('pushState', function (state) {
+						if(state.status=='play' && state.service=='webradio'){
+							socket.emit('stop');
+						} else if(state.status=='play'){
+							socket.emit('pause');
+						} else {
+							socket.emit('play');
+					        }
+					});
 					break;
 				case "next":
 					socket.emit('next');
@@ -83,6 +104,9 @@ lcdctrl.prototype.onStop = function() {
     var self = this;
     var defer=libQ.defer();
 
+    socket.close();
+    socket = null;
+    this.port.close();
     // Once the Plugin has successfull stopped resolve the promise
     defer.resolve();
 

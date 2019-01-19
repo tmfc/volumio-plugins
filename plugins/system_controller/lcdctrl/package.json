@@ -1,0 +1,22 @@
+{
+	"name": "lcdctrl",
+	"version": "1.0.0",
+	"description": "use usart hmi touchscreen to control playback",
+	"main": "index.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"author": "tmfc",
+	"license": "ISC",
+	"volumio_info": {
+		"prettyName": "lcdctrl",
+		"icon": "fa-lightbulb-o",
+		"plugin_type": "system_controller"
+	},
+	"dependencies": {
+		"fs-extra": "^0.28.0",
+		"kew": "^0.7.0",
+		"serialport": "^7.1.3",
+		"v-conf": "^1.4.0"
+	}
+}
